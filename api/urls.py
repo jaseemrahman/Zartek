@@ -11,5 +11,6 @@ urlpatterns = [
     path('Registration',RegistrationApiView.as_view(),name="Registration"),
     path('Login',LoginApiView.as_view(),name="Login"),
     path('', include(router.urls)),
+    path('Driver/<int:pk>', RideAcceptanceViewSet.as_view({'post': 'ride_accept'}), name='ride_accept'),
 
     ]

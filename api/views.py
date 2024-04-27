@@ -71,3 +71,33 @@ class RideViewSet(viewsets.ModelViewSet):
             'message': 'Ride status updated successfully',
             'ride_details': ride_serializer.data,
         }, status=status.HTTP_200_OK)
+    
+class RideAcceptanceViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def ride_accept(self, request, pk=None):
+        try:
+            ride = Ride.objects.get(pk=pk)
+        except Ride.DoesNotExist:
+            return Response({
+                'status': False,
+                'message': 'Ride does not exist.'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if request.user != ride.driver:
+            return Response({
+                'status': False,
+                'message': 'You do not have permission to perform this action.'
+            }, status=status.HTTP_403_FORBIDDEN)
+        
+        if ride.driver_accepted:
+            ride.driver_accepted = False
+        else:
+            ride.driver_accepted = True
+        ride.save()
+        ride_serializer = RideSerializer(ride)
+        return Response({
+            'status': True,
+            'message': 'Driver acceptance status changed successfully.',
+            'ride_details': ride_serializer.data,
+        }, status=status.HTTP_200_OK)
