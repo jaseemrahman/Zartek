@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Zartek - Ride Tracker</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ride List</h1>
+    <table>
+        <tr>
+            <th>Ride ID</th>
+            <th>Rider</th>
+            <th>Driver</th>
+            <th>Status</th>
+            <th>Pickup Location</th>
+            <th>Dropoff Location</th>
+            <th>Current Location</th>
+        </tr>
+        {% for ride in rides %}
+        <tr>
+            <td><a href="{% url 'api:ride_detail' ride.id %}">{{ ride.id }}</a></td>
+            <td><a href="{% url 'api:ride_detail' ride.id %}">{{ ride.rider.name }}</a></td>
+            <td>{{ ride.driver.name }}</td>
+            <td>{{ ride.status }}</td>
+            <td>{{ ride.pickup_location }}</td>
+            <td>{{ ride.dropoff_location }}</td>
+            <td>{{ ride.current_location }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

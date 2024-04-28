@@ -11,6 +11,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import render
 from geopy.distance import geodesic
+from django.shortcuts import render, get_object_or_404
+from django.views import View
 
 # Login API
 class LoginApiView(APIView):
@@ -146,7 +148,17 @@ class RideAcceptanceViewSet(viewsets.ViewSet):
             'ride_details': ride_serializer.data,
         }, status=status.HTTP_200_OK)
     
-    
-def ride_tracker(request, ride_id):
-    return render(request, 'index.html', {'ride_id': ride_id})
 
+class RideTracker(View):
+    def get(self,request, ride_id):
+        return render(request, 'index.html', {'ride_id': ride_id})
+    
+class RideList(View):
+    def get(self,request):
+        rides = Ride.objects.all()
+        return render(request, 'ride_list.html', {'rides': rides})
+    
+class RideDetail(View):
+    def get(self,request, ride_id):
+        ride = get_object_or_404(Ride, id=ride_id)
+        return render(request, 'ride_detail.html', {'ride': ride})

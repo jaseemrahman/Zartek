@@ -1,13 +1,8 @@
 from celery import shared_task
-from faker import Faker
 from api.models import Ride
 
 @shared_task
-def update_ride_locations():
-    fake = Faker()
-    for ride in Ride.objects.filter(status=Ride.STARTED):
-        # Generate simulated location
-        latitude = fake.latitude()
-        longitude = fake.longitude()
-        ride.current_location = models.Point(longitude, latitude)  # Update location using PointField
-        ride.save()
+def update_ride_location(ride_id, new_location):
+    ride = Ride.objects.get(id=ride_id)
+    ride.current_location = new_location
+    ride.save()

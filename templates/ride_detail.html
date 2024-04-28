@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ride Detail</title>
+</head>
+<body>
+    <h1>Ride Detail</h1>
+    <p>Ride ID: {{ ride.id }}</p>
+    <p>Pickup Location: {{ ride.pickup_location }}</p>
+    <p>Dropoff Location: {{ ride.dropoff_location }}</p>
+    <p>Status: {{ ride.status }}</p>
+    <p>Current Location: <span id="current_location">{{ ride.current_location }}</span></p>
+
+    <script>
+        const rideId = {{ ride.id }};
+        const ws = new WebSocket('ws://localhost:8000/ws/ride/' + rideId + '/');
+        const ws = new WebSocket(`ws://${window.location.host}/api/rides/${rideId}/ws/`);
+        ws.onmessage = function(event) {
+            const newLocation = event.data;
+            document.getElementById('current_location').innerText = newLocation;
+        };
+    </script>
+</body>
+</html>

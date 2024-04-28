@@ -37,5 +37,6 @@ class Ride(BaseModel):
     
     class Meta:
         db_table = "Ride"
+
     def __str__(self):
         return str(self.rider.name)

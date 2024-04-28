@@ -13,17 +13,14 @@
   <div id="status"></div>
 
   <script>
-    let socket; // Declare socket variable globally
+    let socket;
 
-    // Function to initialize WebSocket connection
     function initWebSocket() {
-        const rideId = "{{ ride_id }}";  // Retrieve ride_id from Django template
+        const rideId = "{{ ride_id }}";  
         socket = new WebSocket(`ws://${window.location.host}/api/rides/${rideId}/ws/`);
     
-        // WebSocket event handlers
         socket.onopen = function(event) {
             console.log('WebSocket connection established.');
-            // Show connected status (optional)
             const statusElement = document.getElementById('status');
             if (statusElement) {
                 statusElement.innerHTML = 'Connected';
@@ -38,7 +35,6 @@
     
         socket.onclose = function(event) {
             console.log('WebSocket connection closed.');
-            // Show disconnected status (optional)
             const statusElement = document.getElementById('status');
             if (statusElement) {
                 statusElement.innerHTML = 'Disconnected';
@@ -47,24 +43,19 @@
         };
     }
 
-    // Leaflet map setup
     const map = L.map('map').setView([40.7128, -74.0059], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Function to update the map with new location
     function updateMap(location) {
-        // Clear previous markers (if any)
         map.eachLayer(function(layer) {
             if (layer instanceof L.Marker) {
                 map.removeLayer(layer);
             }
         });
 
-        // Add marker for the new location
         L.marker([location.latitude, location.longitude]).addTo(map);
     }
 
-    // Initialize WebSocket connection when the page loads
     window.onload = function() {
         initWebSocket();
     };
