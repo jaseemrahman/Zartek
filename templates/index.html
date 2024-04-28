@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zartek - Ride Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha512-xMK1US𝒱MxKz8BVOUjPpLLQoY8pwjWLVYMv67rqwuhzimoF5LlVxvuXtMlyCOkSunsXkKJFQxSUknONON9kWQ==" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha512-AJEjQJgwLehnBkWcwCwS5oUo08YCClzWZyONIK<+>RPQdhca+NOnL3HNfyTiOA/+BpOmA+aTkXB74L1dcHVXLQ==" crossorigin=""></script>
+</head>
+<body>
+  <h1>Zartek - Ride Tracker</h1>
+  <div id="map" style="width: 100%; height: 400px;"></div>
+  <div id="status"></div>
+
+  <script>
+    let socket; // Declare socket variable globally
+
+    // Function to initialize WebSocket connection
+    function initWebSocket() {
+        const rideId = "{{ ride_id }}";  // Retrieve ride_id from Django template
+        socket = new WebSocket(`ws://${window.location.host}/api/rides/${rideId}/ws/`);
+    
+        // WebSocket event handlers
+        socket.onopen = function(event) {
+            console.log('WebSocket connection established.');
+            // Show connected status (optional)
+            const statusElement = document.getElementById('status');
+            if (statusElement) {
+                statusElement.innerHTML = 'Connected';
+                statusElement.style.color = 'green';
+            }
+        };
+    
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            updateMap(data.current_location);
+        };
+    
+        socket.onclose = function(event) {
+            console.log('WebSocket connection closed.');
+            // Show disconnected status (optional)
+            const statusElement = document.getElementById('status');
+            if (statusElement) {
+                statusElement.innerHTML = 'Disconnected';
+                statusElement.style.color = 'red';
+            }
+        };
+    }
+
+    // Leaflet map setup
+    const map = L.map('map').setView([40.7128, -74.0059], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Function to update the map with new location
+    function updateMap(location) {
+        // Clear previous markers (if any)
+        map.eachLayer(function(layer) {
+            if (layer instanceof L.Marker) {
+                map.removeLayer(layer);
+            }
+        });
+
+        // Add marker for the new location
+        L.marker([location.latitude, location.longitude]).addTo(map);
+    }
+
+    // Initialize WebSocket connection when the page loads
+    window.onload = function() {
+        initWebSocket();
+    };
+  </script>
+
+</body>
+</html>

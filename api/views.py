@@ -9,6 +9,8 @@ from rest_framework import viewsets
 from api.models import Ride,CustomUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import render
+from geopy.distance import geodesic
 
 # Login API
 class LoginApiView(APIView):
@@ -19,6 +21,10 @@ class LoginApiView(APIView):
             if user is not None:
                 refresh = RefreshToken.for_user(user)
                 user_serializer = UserSerializer(user)
+                current_location = request.data.get('current_location', None)  
+                if current_location:
+                    user.current_location = current_location
+                    user.save() 
                 return Response({
                     "status": True,
                     "message": 'Logged in successfully.',
@@ -50,15 +56,52 @@ class RegistrationApiView(APIView):
                 return Response({'error': 'Unable to create user.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
+# Algorithm for matching ride requests with available drivers
+def close_driver(ride):
+    available_drivers = CustomUser.objects.filter(role='2')
+    closest_driver = None
+    min_distance = float('inf')  
+    for driver in available_drivers:
+        if driver.current_location:  
+            driver_lat, driver_lng = driver.current_location.split(",")  
+            distance = geodesic((float(ride.pickup_location.split(",")[0]), float(ride.pickup_location.split(",")[1])), (float(driver_lat), float(driver_lng))).km
+            print(distance,min_distance)
+            if distance < min_distance:
+                min_distance = distance
+                closest_driver = driver
+        else:
+            print(f"Driver {driver.id} has no current location")
+    return closest_driver
+
+       
 # Ride Viewset    
 class RideViewSet(viewsets.ModelViewSet):
     queryset = Ride.objects.all()
     serializer_class = RideSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(rider=self.request.user)
+    def create(self, request):
+        serializer = RideSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(rider=self.request.user) 
+            closest_driver = close_driver(serializer.instance)
+            if closest_driver:
+                serializer.instance.driver = closest_driver
+                serializer.instance.save()
+                return Response({
+                    'status': True,
+                    'message': 'Ride created successfully. Driver assigned.',
+                    'ride_details': serializer.data,
+                }, status=status.HTTP_201_CREATED)  
+            else:
+                return Response({
+                    'status': True,
+                    'message': 'Ride created successfully. No driver found yet.',
+                    'ride_details': serializer.data,
+                }, status=status.HTTP_201_CREATED)  
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -71,7 +114,8 @@ class RideViewSet(viewsets.ModelViewSet):
             'message': 'Ride status updated successfully',
             'ride_details': ride_serializer.data,
         }, status=status.HTTP_200_OK)
-    
+
+# API for drivers to accept a ride request.      
 class RideAcceptanceViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -101,3 +145,8 @@ class RideAcceptanceViewSet(viewsets.ViewSet):
             'message': 'Driver acceptance status changed successfully.',
             'ride_details': ride_serializer.data,
         }, status=status.HTTP_200_OK)
+    
+    
+def ride_tracker(request, ride_id):
+    return render(request, 'index.html', {'ride_id': ride_id})
+

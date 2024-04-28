@@ -4,7 +4,7 @@ from api.models import Ride,CustomUser
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields =  ('name', 'username', 'phone_number', 'email', 'password','role')
+        fields =  ('name', 'username', 'phone_number', 'email', 'password','role','current_location')
         extra_kwargs = {'password': {'write_only': True}}
 
 class LoginSerializer(serializers.Serializer):
