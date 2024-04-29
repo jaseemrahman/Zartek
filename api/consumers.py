@@ -1,47 +1,79 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import WebsocketConsumer
 from .models import Ride
-from django.db.models import Q
+from asgiref.sync import async_to_sync
+from json.decoder import JSONDecodeError
+from channels.layers import get_channel_layer
 
-class RideConsumer(AsyncWebsocketConsumer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.group_name = None
+class RideConsumer(WebsocketConsumer):
+    def connect(self):
+        self.room_name = self.scope['url_route']['kwargs']['ride_id']
+        self.room_group_name = 'ride_%s' % self.room_name
+        async_to_sync(self.channel_layer.group_add)(
+            self.room_group_name,
+            self.channel_name
+        )
+        self.accept()
+    def disconnect(self, close_code):
+        async_to_sync(self.channel_layer.group_discard)(
+            self.room_group_name,
+            self.channel_name
+        )
+    def receive(self, text_data):
+        try:
+            data = json.loads(text_data)
+            print("Received data:", data)
 
-    async def connect(self):
-        # Extract user information from JWT (replace with your logic)
-        user_id = self.scope['user'].id
+            if 'type' not in data:
+                print("Error: 'type' not found in received data.")
+                return
 
-        # Filter rides based on user role (rider or driver)
-        rides = Ride.objects.filter(Q(rider_id=user_id) | Q(driver_id=user_id))
+            if data['type'] == 'ride_location_update':
+                latitude = data.get('latitude')
+                longitude = data.get('longitude')
 
-        # Create a group name for ride updates (can be improved)
-        self.group_name = f"rides_{user_id}"
+                if latitude is None or longitude is None:
+                    print("Error: Latitude or longitude missing in received data.")
+                    return
 
-        # Join the group
-        await self.channel_layer.group_add(self.group_name, self.channel_name)
+                try:
+                    print("Room name:", self.room_name)
+                    ride_id = self.room_name
+                    ride = Ride.objects.get(pk=ride_id)
+                    ride.current_location = f"{latitude},{longitude}"
+                    ride.save()
+                    print("Ride location updated:", ride)
+                    async_to_sync(self.channel_layer.group_send)(
+                        self.room_group_name,
+                        {
+                            'type': 'ride_update',
+                            'ride_id': ride.id,
+                            'latitude': latitude,
+                            'longitude': longitude,
+                        }
+                    )
+                except IndexError:
+                    print("Error: Room name is not in the expected format.")
+                except Ride.DoesNotExist:
+                    print("Error: Ride not found with ID:", ride_id)
 
-        # Optionally, send initial ride data to the client
-        for ride in rides:
-            await self.send_ride_data(ride)
+            else:
+                print("Unknown message type:", data['type'])
 
-        await self.accept()
+        except JSONDecodeError as e:
+            print("JSONDecodeError:", e)
+            print("Error: Malformed JSON data. Please provide valid latitude and longitude.")
 
-    async def disconnect(self, close_code):
-        if self.group_name:
-            # Remove from the group
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+    
 
-    async def receive(self, text_data):
-        data = json.loads(text_data)
-        # Handle data from client (e.g., update location)
-        # ... (implementation depends on your specific needs)
-
-    async def send_ride_data(self, ride):
-        data = {
-            "id": ride.id,
-            "status": ride.status,
-            "current_location": ride.current_location,
-            # Include other relevant ride details
-        }
-        await self.send(text_data=json.dumps(data))
+    def ride_update(self, event):
+        latitude = event['latitude']
+        longitude = event['longitude']
+        ride_id= event['ride_id']
+        self.send(text_data=json.dumps({
+            'type': 'ride_update',
+            'latitude': latitude,
+            'longitude': longitude,
+            'ride_id':ride_id
+        }))
+    

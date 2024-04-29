@@ -3,9 +3,18 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 from api.models import Ride, CustomUser
-from api.serializers import RideSerializer
+# from api.serializers import RideSerializer
 from django.contrib.auth import get_user_model
 from api.views import close_driver
+from channels.testing import WebsocketCommunicator
+# from django.contrib.auth.models import AnonymousUser
+from django.test import TestCase
+from api.consumers import RideConsumer 
+from django.test import TestCase, override_settings
+from channels.testing import WebsocketCommunicator
+from api.consumers import RideConsumer
+
+
 
 # To check comma-separated latitude, longitude format-current location
 def is_valid_location(location):
@@ -89,7 +98,7 @@ class RegistrationApiTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('username', response.data)
 
-# # Ride View Test
+# Ride View Test
 class RideViewSetTest(TestCase):
 
     def setUp(self):
@@ -149,5 +158,94 @@ class RideViewSetTest(TestCase):
         rider = Ride.objects.create(pickup_location='10.0,20.0')
         closest_driver = close_driver(rider)
         self.assertIsNone(closest_driver)
+
+# Websocket
+class RideConsumerTest(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = get_user_model().objects.create_user(username='test_user', password='password123')
+        cls.ride_id = 26 
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.user.delete()
+
+    @override_settings(CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}})
+    async def test_websocket_connection(self):
+        path = f'/api/ws/ride/{self.ride_id}/'
+        communicator = WebsocketCommunicator(RideConsumer.as_asgi(), path=path)
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        data = {'type': 'ride_location_update', 'latitude': 12.345, 'longitude': 56.789}
+        await communicator.send_json_to(data)
+        response = await communicator.receive_json_from()
+        self.assertIn('type', response)
+        self.assertEqual(response['type'], 'ride_update')  
+        await communicator.disconnect()
+
+    async def test_invalid_message_type(self):
+        path = f'/api/ws/ride/{self.ride_id}/'
+        communicator = WebsocketCommunicator(RideConsumer.as_asgi(), path=path)
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        data = {'invalid_type': 'some_data'}
+        await communicator.send_json_to(data)
+
+        response = await communicator.receive_json_from()
+        self.assertIn('error', response)
+        self.assertEqual(response['error'], "Invalid message type")
+
+        await communicator.disconnect()
+
+    async def test_missing_location_data(self):
+        path = f'/api/ws/ride/{self.ride_id}/'
+        communicator = WebsocketCommunicator(RideConsumer.as_asgi(), path=path)
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        data = {'type': 'ride_location_update'}
+        await communicator.send_json_to(data)
+        response = await communicator.receive_json_from()
+        self.assertIn('error', response)
+        self.assertEqual(response['error'], "Latitude or longitude missing")
+
+        await communicator.disconnect()
+
+    async def test_nonexistent_ride(self):
+        path = f'/api/ws/ride/999/'
+        communicator = WebsocketCommunicator(RideConsumer.as_asgi(), path=path)
+        connected, _ = await communicator.connect()
+        self.assertFalse(connected) 
+
+    async def test_unauthorized_connection(self):
+        path = f'/api/ws/ride/{self.ride_id}/'
+        communicator = WebsocketCommunicator(RideConsumer.as_asgi(), path=path)
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        data = {'type': 'ride_location_update', 'latitude': 12.345, 'longitude': 56.789}
+        await communicator.send_json_to(data)
+
+        response = await communicator.receive_json_from()
+        self.assertIn('error', response)
+        self.assertEqual(response['error'], "Unauthorized connection")
+
+        await communicator.disconnect()
+
+
+
+
+
+
+
+
+
+
+
+
 
         

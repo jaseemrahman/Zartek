@@ -149,16 +149,20 @@ class RideAcceptanceViewSet(viewsets.ViewSet):
         }, status=status.HTTP_200_OK)
     
 
+
+# Additionaly Done. 
 class RideTracker(View):
     def get(self,request, ride_id):
         return render(request, 'index.html', {'ride_id': ride_id})
     
-class RideList(View):
-    def get(self,request):
-        rides = Ride.objects.all()
-        return render(request, 'ride_list.html', {'rides': rides})
+# class RideList(View):
+#     def get(self,request):
+#         rides = Ride.objects.all()
+#         return render(request, 'ride_list.html', {'rides': rides})
     
-class RideDetail(View):
-    def get(self,request, ride_id):
-        ride = get_object_or_404(Ride, id=ride_id)
-        return render(request, 'ride_detail.html', {'ride': ride})
+# class RideDetail(View):
+#     def get(self,request, ride_id):
+#         ride = get_object_or_404(Ride, id=ride_id)
+#         return render(request, 'ride_detail.html', {'ride': ride})
+
+
