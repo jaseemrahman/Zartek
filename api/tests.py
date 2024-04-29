@@ -6,6 +6,11 @@ from api.models import Ride, CustomUser
 from api.serializers import RideSerializer
 from django.contrib.auth import get_user_model
 from api.views import close_driver
+from channels.testing import WebsocketCommunicator
+from django.contrib.auth.models import AnonymousUser
+from django.test import TestCase
+from api.consumers import RideConsumer 
+
 
 # To check comma-separated latitude, longitude format-current location
 def is_valid_location(location):
@@ -149,5 +154,104 @@ class RideViewSetTest(TestCase):
         rider = Ride.objects.create(pickup_location='10.0,20.0')
         closest_driver = close_driver(rider)
         self.assertIsNone(closest_driver)
+
+
+class RideConsumerTest(TestCase):
+
+
+    def setUp(self):
+        self.test_ride = Ride.objects.create(pk=123)
+
+    async def test_connect_and_update_location(self):
+        user = AnonymousUser()  # Simulate anonymous user connection
+        communicator = WebsocketCommunicator(
+            application=RideConsumer.as_asgi(),  # Point to the ASGI application
+            path='/api/ride/123/',  # Replace with the actual path pattern
+            headers={'Authorization': 'Token some_token'}  # Add auth headers if needed
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        # Send valid location update data
+        await communicator.send_json_to({
+            'type': 'ride_location_update',
+            'latitude': 37.7749,
+            'longitude': -122.4194,
+        })
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response['type'], 'ride_update')
+        self.assertEqual(response['ride_id'], 123)  # Expected ride ID
+
+        # Check if Ride object is updated (use Django's ORM for actual fetching)
+        ride = Ride.objects.get(pk=123)  # Replace with appropriate fetching logic
+        self.assertEqual(ride.current_location, "37.7749,-122.4194")
+
+        await communicator.disconnect()
+
+    async def test_missing_data(self):
+        communicator = WebsocketCommunicator(
+            application=RideConsumer.as_asgi(),
+            path='/ride/123/',
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        # Send data without 'type' field
+        await communicator.send_json_to({'latitude': 37.7749})
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response['type'], 'error')  # Expect error message
+
+        await communicator.disconnect()
+
+    async def test_malformed_json(self):
+        communicator = WebsocketCommunicator(
+            application=RideConsumer.as_asgi(),
+            path='/ride/123/',
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        # Send invalid JSON string
+        await communicator.send_text_to('{"invalid_data')
+
+        response = await communicator.receive_json_from()
+        self.assertIsInstance(response, dict)  # Expect error dictionary
+        self.assertIn('JSONDecodeError', response.get('type', ''))  # Check for error type
+
+        await communicator.disconnect()
+
+    async def test_nonexistent_ride(self):
+        communicator = WebsocketCommunicator(
+            application=RideConsumer.as_asgi(),
+            path='/ride/999/',  # Non-existent ride ID
+        )
+
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+
+        # Send valid location update data
+        await communicator.send_json_to({
+            'type': 'ride_location_update',
+            'latitude': 37.7749,
+            'longitude': -122.4194,
+        })
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response['type'], 'error')
+
+
+
+
+
+
+
+
+
+
 
         

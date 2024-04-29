@@ -14,6 +14,6 @@ urlpatterns = [
     path('Driver/<int:pk>', RideAcceptanceViewSet.as_view({'post': 'ride_accept'}), name='ride_accept'),
     path('zartek/<int:ride_id>/',RideTracker.as_view(), name='ride_tracker'),
 
-    path('zartek', RideList.as_view(), name='ride_list'),
-    path('zartek/Ride/<int:ride_id>/',RideDetail.as_view(), name='ride_detail'),
+    # path('zartek', RideList.as_view(), name='ride_list'),
+    # path('zartek/Ride/<int:ride_id>/',RideDetail.as_view(), name='ride_detail'),
     ]

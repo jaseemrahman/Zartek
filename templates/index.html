@@ -17,7 +17,9 @@
 
     function initWebSocket() {
         const rideId = "{{ ride_id }}";  
-        socket = new WebSocket(`ws://${window.location.host}/api/rides/${rideId}/ws/`);
+        // socket = new WebSocket(`ws://${window.location.host}/api/rides/${rideId}`);
+        socket = new WebSocket(`ws://${window.location.host}/ws/ride/${rideId}/`);
+
     
         socket.onopen = function(event) {
             console.log('WebSocket connection established.');
